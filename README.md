@@ -65,6 +65,14 @@ Busca **Pimiento Joe** en el menú de aplicaciones y ejecútalo.
 
 ---
 
+### Cómo desinstalar
+
+Simplemente 
+
+```
+sudo dpkg -P pimiento
+```
+
 ## Opción B — Versión Portable
 
 Perfecta para:
