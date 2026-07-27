@@ -41,7 +41,7 @@ Esta opción instala la aplicación en:
 
 y crea automáticamente un acceso directo en el menú de aplicaciones.
 
-### 1. Descarga
+### 1. Descarga desde el apartado Releases el paquete
 
 ```
 pimiento_1.0-1_amd64.deb
