@@ -73,6 +73,13 @@ Simplemente
 sudo dpkg -P pimiento
 ```
 
+Es aconsejable, para borrar archivos a nivel de usuario que puedan quedar, ejecutar el script desinstalar.sh:
+
+```
+./desinstalar.sh
+```
+
+
 ## Opción B — Versión Portable
 
 Perfecta para:
