@@ -27,7 +27,7 @@ mkdir -p "$DIR/usr/share/applications"
 cp dist/pimiento "$DIR/opt/pimiento_joe/pimiento"
 cp img/pimentin.png "$DIR/opt/pimiento_joe/pimentin.png"
 
-# Crear un enlace simbólico en /usr/bin apuntando a /opt (estándar de Linux)
+# Crear un enlace simbólico en /usr/bin apuntando a /opt
 ln -s /opt/pimiento_joe/pimiento "$DIR/usr/bin/pimiento"
 
 # Crear el archivo de metadatos de control de Debian
@@ -41,6 +41,17 @@ Maintainer: Felipe <felipe@ideacentre>
 Description: Pimiento Joe - The Ultimate Bedtime Reader.
  Extract text from PDF, EPUB, and MOBI, and convert it to natural audio MP3.
 EOF
+
+# CREACIÓN DEL SCRIPT POSTRM DE DEBIAN (NUEVO: Limpieza absoluta de /opt al desinstalar)
+cat <<EOF > "$DIR/DEBIAN/postrm"
+#!/bin/sh
+set -e
+# Cuando el paquete se elimine o se purgue, borramos la carpeta /opt/pimiento_joe por completo
+if [ "\$1" = "remove" ] || [ "\$1" = "purge" ]; then
+    rm -rf /opt/pimiento_joe
+fi
+EOF
+chmod +x "$DIR/DEBIAN/postrm" # Súper importante dar permisos al script interno
 
 # Crear el acceso directo oficial del sistema apuntando a /opt
 cat <<EOF > "$DIR/usr/share/applications/pimiento.desktop"
