@@ -2,7 +2,7 @@
   <img src="img/pimentin.png" alt="Pimiento Joe Logo" width="130">
 </p>
 
-<h1 align="center">🌶️ PIMIENTO JOE</h1>
+<h1 align="center">🌶️ PIMIENTO JOE 🌶️</h1>
 
 <p align="center">
   <strong>The Ultimate Bedtime Reader</strong>
