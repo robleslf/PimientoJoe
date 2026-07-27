@@ -121,35 +121,11 @@ class SplashScreen(QWidget):
         layout.addWidget(frame)
 
 class WelcomeWidget(QFrame):
-    fileDropped = pyqtSignal(str)  
-    draggedEnter = pyqtSignal()   
-    draggedLeave = pyqtSignal()   
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("WelcomeWidget")
-        self.setAcceptDrops(True)
+        self.setAcceptDrops(False) # Delega el arrastre al MainWindow
         
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasUrls():
-            ruta = event.mimeData().urls()[0].toLocalFile()
-            if ruta.lower().endswith(('.pdf', '.epub', '.mobi')):
-                event.acceptProposedAction()
-                self.draggedEnter.emit() 
-                
-    def dragLeaveEvent(self, event):
-        self.draggedLeave.emit() 
-        super().dragLeaveEvent(event)
-
-    def dropEvent(self, event):
-        if event.mimeData().hasUrls():
-            ruta = event.mimeData().urls()[0].toLocalFile()
-            if ruta.lower().endswith(('.pdf', '.epub', '.mobi')):
-                self.fileDropped.emit(ruta) 
-                event.acceptProposedAction()
-        else:
-            event.ignore()
-
     def paintEvent(self, event):
         super().paintEvent(event)
         if os.path.exists(RUTA_ICONO):
@@ -171,6 +147,7 @@ class PimientoJoeApp(QMainWindow):
         super().__init__()
         self.setWindowTitle("Pimiento Joe - Lector Multiformato")
         
+        # Hojas de estilo aplicadas al QFrame#WelcomeWidget
         self.STYLE_BIENVENIDA_NORMAL = f"""
             QFrame#WelcomeWidget {{
                 border: 3px dashed {NEON_GREEN};
@@ -200,7 +177,7 @@ class PimientoJoeApp(QMainWindow):
             "🚀 Muy Rápido (Nivel 5)": 0.70
         }
 
-        self.setAcceptDrops(False)
+        self.setAcceptDrops(True)
         
         if os.path.exists(RUTA_ICONO):
             self.setWindowIcon(QIcon(RUTA_ICONO))
@@ -397,9 +374,11 @@ class PimientoJoeApp(QMainWindow):
         slider_layout.addWidget(self.lbl_slider_contador)
         visor_layout.addLayout(slider_layout)
 
-        # Controles selección numérica
+        # Controles selección numérica (CENTRADOS)
         selec_layout = QHBoxLayout()
         selec_layout.setSpacing(10)
+        
+        selec_layout.addStretch(1)
         
         selec_layout.addWidget(QLabel("Generar desde pág:"))
         self.spin_n1 = QSpinBox()
@@ -424,7 +403,7 @@ class PimientoJoeApp(QMainWindow):
         selec_layout.addStretch(1)
         visor_layout.addLayout(selec_layout)
 
-        # Configuración de Voz y Velocidad
+        # Configuración de Voz, Velocidad y FORMATO (COMPACTOS A LA IZQUIERDA)
         idioma_layout = QHBoxLayout()
         idioma_layout.setSpacing(10)
         
@@ -500,7 +479,7 @@ class PimientoJoeApp(QMainWindow):
         self.lbl_estado.setStyleSheet(f"color: {NEON_GREEN}; font-size: 16px; font-weight: bold;")
         main_layout.addWidget(self.lbl_estado)
 
-        # Botón de Generar
+        # Botón de Generar (VUELVE A SER MP3 OFFLINE DINÁMICO)
         self.btn_generar = QPushButton("🎧 GENERAR AUDIO 🎧")
         self.btn_generar.setStyleSheet(f"QPushButton {{ background-color: {ORANGE_ACCENT}; color: white; border: 2px solid white; font-size: 20px; }} QPushButton:hover {{ background-color: #ff3300; }}")
         self.btn_generar.hide()
@@ -515,14 +494,23 @@ class PimientoJoeApp(QMainWindow):
 
         self.comprobar_seleccion_texto()
 
-    # --- LÓGICA DE ARRASTRAR Y SOLTAR ---
+    # --- LÓGICA DE ARRASTRAR Y SOLTAR DESDE MAIN WINDOWS CON MOVIMIENTO (COMPATIBLE CON WAYLAND) ---
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
             self.placeholder_widget.setStyleSheet(self.STYLE_BIENVENIDA_DRAG)
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
                 
     def dragLeaveEvent(self, event):
         self.placeholder_widget.setStyleSheet(self.STYLE_BIENVENIDA_NORMAL)
+        event.accept()
 
     def dropEvent(self, event):
         if event.mimeData().hasUrls():
@@ -531,7 +519,11 @@ class PimientoJoeApp(QMainWindow):
                 self.cargar_libro_desde_ruta(ruta)
                 event.acceptProposedAction()
             else:
+                self.placeholder_widget.setStyleSheet(self.STYLE_BIENVENIDA_NORMAL)
                 event.ignore()
+        else:
+            self.placeholder_widget.setStyleSheet(self.STYLE_BIENVENIDA_NORMAL)
+            event.ignore()
 
     # --- LÓGICA DE CARGA CENTRALIZADA ---
     def cargar_archivo_dialogo(self):
