@@ -6,3 +6,4 @@ __pycache__/
 pimiento.spec
 *.deb
 *.tar.gz
+/bin
