@@ -12,7 +12,7 @@
 
 ## 📖 ¿Qué es Pimiento Joe?
 
-**Pimiento Joe** es una aplicación de escritorio **portable y responsiva para Linux**, diseñada con una estética **retro noventera** y un toque gamberro.
+**Pimiento Joe** es una aplicación de escritorio **para Linux**
 
 Su objetivo es convertir fragmentos concretos de tus libros digitales (**PDF**, **EPUB** y **MOBI**) en archivos de audio **MP3** utilizando voces neuronales premium con una calidad extremadamente natural.
 
