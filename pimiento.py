@@ -1,6 +1,9 @@
 import sys
 import os
+import re
+import asyncio
 import threading
+import fitz  # PyMuPDF
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QPushButton, QLabel, QFileDialog, QFrame, 
                              QStackedWidget, QHBoxLayout, QSpinBox, QMessageBox,
@@ -121,7 +124,6 @@ class WelcomeWidget(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("WelcomeWidget")
-        # CLAVE: Obligamos a que ignore los arrastres para que los herede la ventana principal (Sugerencia 1)
         self.setAcceptDrops(False)
         
     def paintEvent(self, event):
@@ -160,7 +162,13 @@ class PimientoJoeApp(QMainWindow):
             }}
         """
 
-        # Mapeo de velocidad para el motor local Piper (length_scale: mayor es más lento)
+        # Voces locales offline mapeadas a su código de idioma en el backend (NUEVO)
+        self.voces_map = {
+            "🇪🇸 Español (Local) - Davefx": "es_ES",
+            "🇺🇸 Inglés (Local) - Amy": "en_US",
+            "🇨🇳 Chino (Local) - Huayan": "zh_CN"
+        }
+
         self.velocidad_map = {
             "🐢 Muy Despacio (Nivel 1)": 1.35,
             "🚶 Despacio (Nivel 2)": 1.15,
@@ -169,7 +177,6 @@ class PimientoJoeApp(QMainWindow):
             "🚀 Muy Rápido (Nivel 5)": 0.70
         }
 
-        # Permitir Arrastre en la ventana principal (Sugerencia 1)
         self.setAcceptDrops(True)
         
         if os.path.exists(RUTA_ICONO):
@@ -232,7 +239,7 @@ class PimientoJoeApp(QMainWindow):
         self.pagina_actual = 0
         self.total_paginas = 0
         
-        # CONFIGURACIÓN DEL ANIMADOR ESPACIAL CON TEXTO OFFLINE (NUEVO)
+        # CONFIGURACIÓN DEL ANIMADOR ESPACIAL CON TEXTO OFFLINE
         self.timer_espacial = QTimer()
         self.timer_espacial.timeout.connect(self.actualizar_animacion_espacial)
         self.contador_frame = 0
@@ -391,13 +398,12 @@ class PimientoJoeApp(QMainWindow):
         
         visor_layout.addLayout(selec_layout)
 
-        # Configuración de Voz y Velocidad (IDIOMA FIJO LOCAL)
+        # Configuración de Voz y Velocidad (SELECTOR MULTILINGÜE LOCAL RESTAURADO)
         idioma_layout = QHBoxLayout()
         idioma_layout.addWidget(QLabel("🗣️ Voz Activa:"))
-        
-        lbl_voz_local = QLabel("🇪🇸 Español - Davefx (Voz de IA Local Offline)")
-        lbl_voz_local.setStyleSheet(f"color: {NEON_GREEN}; font-size: 14px;")
-        idioma_layout.addWidget(lbl_voz_local)
+        self.combo_idioma = QComboBox()
+        self.combo_idioma.addItems(self.voces_map.keys())
+        idioma_layout.addWidget(self.combo_idioma)
 
         idioma_layout.addWidget(QLabel("  ⏱️ Velocidad:"))
         self.combo_velocidad = QComboBox()
@@ -472,7 +478,7 @@ class PimientoJoeApp(QMainWindow):
 
         self.comprobar_seleccion_texto()
 
-    # --- LÓGICA DE ARRASTRAR Y SOLTAR CORREGIDA (Sugerencia 1) ---
+    # --- LÓGICA DE ARRASTRAR Y SOLTAR CORREGIDA ---
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             # Aceptamos el arrastre propuesto de forma directa (Wayland compatible)
@@ -641,6 +647,10 @@ class PimientoJoeApp(QMainWindow):
         recorte_inicio = self.txt_recorte_inicio.text().strip()
         recorte_fin = self.txt_recorte_fin.text().strip()
 
+        # Identificar la voz seleccionada (Español, Inglés o Chino)
+        idioma_elegido = self.combo_idioma.currentText()
+        idioma_code = self.voces_map[idioma_elegido]
+
         # Identificar la velocidad de lectura (length_scale de Piper)
         velocidad_elegida = self.combo_velocidad.currentText()
         velocidad_rate = self.velocidad_map[velocidad_elegida]
@@ -658,17 +668,17 @@ class PimientoJoeApp(QMainWindow):
 
         hilo = threading.Thread(
             target=self.proceso_audio_background, 
-            args=(n1, n2, recorte_inicio, recorte_fin, velocidad_rate)
+            args=(n1, n2, recorte_inicio, recorte_fin, velocidad_rate, idioma_code)
         )
         hilo.start()
 
-    def proceso_audio_background(self, n1, n2, recorte_inicio, recorte_fin, rate):
+    def proceso_audio_background(self, n1, n2, recorte_inicio, recorte_fin, rate, idioma_code):
         try:
             texto_completo = lector.extraer_y_recortar_texto(self.doc, n1, n2, recorte_inicio, recorte_fin)
             nombre_salida = lector.generar_nombre_salida(self.ruta_archivo, n1, n2)
             
-            # USAMOS NUESTRO BACKEND OFFLINE PIPER (NUEVO)
-            lector.generar_audio_offline(texto_completo, nombre_salida, rate)
+            # Pasamos también el idioma elegido al motor de voz offline (NUEVO)
+            lector.generar_audio_offline(texto_completo, nombre_salida, rate, idioma_code)
             
             self.avisador.finalizado.emit(nombre_salida)
         except Exception as e:

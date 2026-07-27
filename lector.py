@@ -2,12 +2,11 @@ import os
 import re
 import sys
 import subprocess
-import fitz  # PyMuPDF (AÑADIDO IMPORT CORRECTO)
+import fitz  # PyMuPDF
 
 def resource_path(relative_path):
     """ Obtiene la ruta absoluta de los recursos, compatible con desarrollo y PyInstaller """
     try:
-        # PyInstaller crea una carpeta temporal en _MEIPASS
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
@@ -57,13 +56,23 @@ def generar_nombre_salida(ruta_original, n1, n2):
     nombre_limpio = re.sub(r'[\s\W]+', '_', nombre_base)
     return f"{nombre_limpio}_pps_{n1}_{n2}.wav"
 
-def generar_audio_offline(texto, nombre_archivo, length_scale):
+def generar_audio_offline(texto, nombre_archivo, length_scale, idioma_code):
     """ Ejecuta el motor neuronal local Piper TTS de forma 100% offline y portátil """
     piper_bin = resource_path("bin/piper/piper")
-    voice_model = resource_path("bin/piper/es_ES-davefx-medium.onnx")
+    
+    # Mapeo de idiomas offline a su modelo ONNX empaquetado (NUEVO)
+    voces_modelos = {
+        "es_ES": "es_ES-davefx-medium.onnx",
+        "en_US": "en_US-amy-medium.onnx",
+        "zh_CN": "zh_CN-huayan-medium.onnx"
+    }
+    
+    # Fallback por si llega algún código raro
+    modelo_elegido = voces_modelos.get(idioma_code, "es_ES-davefx-medium.onnx")
+    voice_model = resource_path(f"bin/piper/{modelo_elegido}")
     
     if not os.path.exists(piper_bin) or not os.path.exists(voice_model):
-        raise FileNotFoundError("No se encontró el motor de voz Piper offline o su modelo en español.")
+        raise FileNotFoundError(f"No se encontró el motor de voz Piper offline o el modelo de voz {modelo_elegido}.")
 
     # Asegurar permisos de ejecución al binario desempaquetado en caliente
     os.chmod(piper_bin, 0o755)

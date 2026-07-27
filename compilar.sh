@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Pimiento Joe - Compilador Automático y Setup de Desarrollo (100% Offline)
+# Pimiento Joe - Compilador Automático y Setup de Desarrollo (100% Offline Multi-idioma)
 # Abortar inmediatamente si ocurre algún error inesperado
 set -e
 
@@ -27,7 +27,7 @@ else
     echo "✅ Entorno virtual 'env' detectado."
 fi
 
-# 3. Descargar el motor neuronal Piper TTS y la voz de forma local (Sugerencia 1)
+# 3. Descargar el motor neuronal Piper TTS y las voces locales de forma portátil (Sugerencia 1)
 if [ ! -d "bin/piper" ]; then
     echo "📥 Descargando motor de voz offline Piper TTS..."
     mkdir -p bin/piper
@@ -37,10 +37,19 @@ if [ ! -d "bin/piper" ]; then
     tar -xzf /tmp/piper.tar.gz -C bin/
     rm -f /tmp/piper.tar.gz
     
-    echo "📥 Descargando modelo de voz neuronal en español (es_ES-davefx-medium)..."
+    echo "📥 Descargando modelo de voz neuronal en español (es_ES-davefx-medium) 🇪🇸..."
     wget -q --show-progress -O bin/piper/es_ES-davefx-medium.onnx "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/es/es_ES/davefx/medium/es_ES-davefx-medium.onnx?download=true"
     wget -q --show-progress -O bin/piper/es_ES-davefx-medium.onnx.json "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/es/es_ES/davefx/medium/es_ES-davefx-medium.onnx.json?download=true"
-    echo "✅ Motor offline y voz listos en bin/piper/."
+
+    echo "📥 Descargando modelo de voz neuronal en inglés (en_US-amy-medium) 🇺🇸..."
+    wget -q --show-progress -O bin/piper/en_US-amy-medium.onnx "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/en_US-amy-medium.onnx?download=true"
+    wget -q --show-progress -O bin/piper/en_US-amy-medium.onnx.json "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/en_US-amy-medium.onnx.json?download=true"
+
+    echo "📥 Descargando modelo de voz neuronal en chino (zh_CN-huayan-medium) 🇨🇳..."
+    wget -q --show-progress -O bin/piper/zh_CN-huayan-medium.onnx "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/zh/zh_CN/huayan/medium/zh_CN-huayan-medium.onnx?download=true"
+    wget -q --show-progress -O bin/piper/zh_CN-huayan-medium.onnx.json "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/zh/zh_CN/huayan/medium/zh_CN-huayan-medium.onnx.json?download=true"
+
+    echo "✅ Motor offline y voces listas en bin/piper/."
 fi
 
 # 4. Activar el entorno virtual seguro
@@ -60,7 +69,7 @@ else
     exit 1
 fi
 
-# 7. Compilar Pimiento Joe (Empaquetamos la carpeta de Piper y la voz dentro de la app) (Sugerencia 2)
+# 7. Compilar Pimiento Joe (Empaquetamos la carpeta de Piper y todas las voces dentro de la app)
 echo "🚀 Compilando ejecutable portable de PIMIENTO JOE OFFLINE..."
 pyinstaller --onefile --windowed \
     --add-data "img/pimentin.png:img" \
@@ -68,12 +77,12 @@ pyinstaller --onefile --windowed \
     --icon="img/pimentin.png" \
     pimiento.py
 
-# 8. Empaquetar la release de Jose Luis (Compresión limpia del binario portable)
-echo "📦 Creando el archivo portable comprimido para Jose Luis..."
+# 8. Empaquetar la release comprimida (Sin menciones personales)
+echo "📦 Creando el archivo portable comprimido para compartir..."
 tar -czf PimientoJoe_portable.tar.gz -C dist pimiento
 
 echo "--------------------------------------------------------"
 echo "✨ ¡PROCESO COMPLETADO CON ÉXITO! ✨"
 echo "👉 Tu app de desarrollo ha sido compilada."
-echo "👉 El instalador offline para Jose Luis está en: PimientoJoe_portable.tar.gz"
+echo "👉 La versión portable para compartir está lista en: PimientoJoe_portable.tar.gz"
 echo "--------------------------------------------------------"
