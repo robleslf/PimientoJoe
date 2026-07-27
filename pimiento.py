@@ -3,6 +3,7 @@ import os
 import re
 import asyncio
 import threading
+import subprocess  # Para inyectar comandos de sistema de forma segura
 import fitz  # PyMuPDF
 import edge_tts
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
@@ -31,13 +32,14 @@ def resource_path(relative_path):
 
 RUTA_ICONO = resource_path("img/pimentin.png")
 
-# --- LÓGICA DE AUTO-REGISTRO PORTABLE ---
+# --- LÓGICA DE AUTO-REGISTRO PORTABLE CON MAGIA DE CONFIANZA (NUEVO) ---
 def auto_registrar_desktop_linux():
-    """ Registra el icono y el lanzador de forma silenciosa en el PC de cualquier amigo """
+    """ Registra el icono y fuerza a Linux a confiar en los lanzadores automáticamente """
     if getattr(sys, 'frozen', False):
         try:
             executable_path = os.path.abspath(sys.executable)
             
+            # 1. Guardar el icono en el sistema local
             dest_icon_dir = os.path.expanduser("~/.local/share/icons")
             os.makedirs(dest_icon_dir, exist_ok=True)
             dest_icon_path = os.path.join(dest_icon_dir, "pimentin_app.png")
@@ -46,26 +48,18 @@ def auto_registrar_desktop_linux():
                 import shutil
                 shutil.copy(RUTA_ICONO, dest_icon_path)
                 
-            # 1. Crear el acceso directo en el sistema local
+            # Lanzador del sistema local
             desktop_dir = os.path.expanduser("~/.local/share/applications")
             os.makedirs(desktop_dir, exist_ok=True)
             desktop_file_path = os.path.join(desktop_dir, "pimiento.desktop")
             
-            with open(desktop_file_path, "w") as f:
-                f.write(f"""[Desktop Entry]
-Type=Application
-Name=Pimiento Joe
-Exec="{executable_path}"
-Icon={dest_icon_path}
-Terminal=false
-StartupWMClass=pimiento
-""")
-            os.chmod(desktop_file_path, 0o755)
-
-            # 2. NUEVO: Crear un acceso directo LOCAL al lado del ejecutable (para el USB de Jose Luis)
+            # Lanzador local portátil (el que verá Jose Luis al lado de la app)
             local_desktop_path = os.path.join(os.path.dirname(executable_path), "PimientoJoe.desktop")
-            with open(local_desktop_path, "w") as f:
-                f.write(f"""[Desktop Entry]
+
+            # Escribimos y damos permisos a ambos
+            for path in [desktop_file_path, local_desktop_path]:
+                with open(path, "w") as f:
+                    f.write(f"""[Desktop Entry]
 Type=Application
 Name=Pimiento Joe
 Exec="{executable_path}"
@@ -73,7 +67,16 @@ Icon={dest_icon_path}
 Terminal=false
 StartupWMClass=pimiento
 """)
-            os.chmod(local_desktop_path, 0o755)
+                # Permiso de ejecución de archivo en Linux (+x)
+                os.chmod(path, 0o755)
+                
+                # INYECTAR CONFIANZA SILENCIOSA EN LINUX (NUEVO - EVITA CLIC DERECHO DEL AMIGO)
+                # Ejecutamos ambos parámetros para asegurar compatibilidad con versiones antiguas y modernas de Ubuntu
+                try:
+                    subprocess.run(["gio", "set", path, "metadata::trusted", "yes"], capture_output=True)
+                    subprocess.run(["gio", "set", path, "metadata::trusted", "true"], capture_output=True)
+                except Exception:
+                    pass
 
         except Exception:
             pass
