@@ -31,6 +31,41 @@ def resource_path(relative_path):
 
 RUTA_ICONO = resource_path("img/pimentin.png")
 
+# --- LÓGICA DE AUTO-REGISTRO PORTABLE PARA AMIGOS (NUEVO) ---
+def auto_registrar_desktop_linux():
+    """ Registra el icono y el lanzador de forma silenciosa en el PC de cualquier amigo """
+    # Solo actuar si estamos ejecutando el binario compilado (frozen)
+    if getattr(sys, 'frozen', False):
+        try:
+            executable_path = os.path.abspath(sys.executable)
+            
+            # 1. Guardar el icono en el sistema local del amigo de forma permanente
+            dest_icon_dir = os.path.expanduser("~/.local/share/icons")
+            os.makedirs(dest_icon_dir, exist_ok=True)
+            dest_icon_path = os.path.join(dest_icon_dir, "pimentin_app.png")
+            
+            if os.path.exists(RUTA_ICONO):
+                import shutil
+                shutil.copy(RUTA_ICONO, dest_icon_path)
+                
+            # 2. Crear el lanzador .desktop dinámico apuntando a su USB/Drive actual
+            desktop_dir = os.path.expanduser("~/.local/share/applications")
+            os.makedirs(desktop_dir, exist_ok=True)
+            desktop_file_path = os.path.join(desktop_dir, "pimiento.desktop")
+            
+            with open(desktop_file_path, "w") as f:
+                f.write(f"""[Desktop Entry]
+Type=Application
+Name=Pimiento Joe
+Exec="{executable_path}"
+Icon={dest_icon_path}
+Terminal=false
+StartupWMClass=pimiento
+""")
+            os.chmod(desktop_file_path, 0o755)
+        except Exception:
+            pass # Silencioso, si no tiene permisos que no rompa el arranque de la app
+
 class AvisadorAudio(QObject):
     finalizado = pyqtSignal(str)
     error = pyqtSignal(str)
@@ -76,7 +111,6 @@ class WelcomeWidget(QFrame):
     def paintEvent(self, event):
         super().paintEvent(event)
         
-        # Dibujamos la marca de agua sutil
         if os.path.exists(RUTA_ICONO):
             painter = QPainter(self)
             painter.setOpacity(0.06) 
@@ -96,7 +130,6 @@ class PimientoJoeApp(QMainWindow):
         super().__init__()
         self.setWindowTitle("Pimiento Joe - Lector Multiformato")
         
-        # Estilos aplicados al QFrame#WelcomeWidget
         self.STYLE_BIENVENIDA_NORMAL = f"""
             QFrame#WelcomeWidget {{
                 border: 3px dashed {NEON_GREEN};
@@ -193,7 +226,7 @@ class PimientoJoeApp(QMainWindow):
         self.pagina_actual = 0
         self.total_paginas = 0
         
-        # CONFIGURACIÓN DEL ANIMADOR ESPACIAL CON TEXTO DE TIEMPO (NUEVO)
+        # CONFIGURACIÓN DEL ANIMADOR ESPACIAL CON TEXTO DE TIEMPO
         self.timer_espacial = QTimer()
         self.timer_espacial.timeout.connect(self.actualizar_animacion_espacial)
         self.contador_frame = 0
@@ -315,7 +348,7 @@ class PimientoJoeApp(QMainWindow):
         nav_layout.addWidget(self.btn_next)
         visor_layout.addLayout(nav_layout)
 
-        # NUEVO: Barra de Deslizamiento Rápido de Página (QSlider) (NUEVO)
+        # Barra de Deslizamiento Rápido de Página
         slider_layout = QHBoxLayout()
         slider_layout.addWidget(QLabel("🧭 Navegación rápida:"))
         self.slider_paginas = QSlider(Qt.Orientation.Horizontal)
@@ -388,13 +421,7 @@ class PimientoJoeApp(QMainWindow):
         place_layout = QVBoxLayout(self.placeholder_widget)
         place_layout.setAlignment(Qt.AlignmentFlag.AlignCenter) 
         
-        self.lbl_bienvenida_logo = QLabel()
-        self.lbl_bienvenida_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        if os.path.exists(RUTA_ICONO):
-            pix_big = QPixmap(RUTA_ICONO).scaled(80, 80, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            self.lbl_bienvenida_logo.setPixmap(pix_big)
-        place_layout.addWidget(self.lbl_bienvenida_logo)
-        
+        # Texto limpio sin el cartel de AZW3
         self.lbl_bienvenida = QLabel(
             "💡 Haz clic en 'Cargar Libro' arriba\n"
             "O ARRASTRA TU ARCHIVO DIRECTAMENTE AQUÍ PARA EMPEZAR\n\n"
@@ -487,7 +514,7 @@ class PimientoJoeApp(QMainWindow):
             self.spin_n1.setValue(1)
             self.spin_n2.setValue(1)
             
-            # Seteamos el rango del Slider al cargar el libro (NUEVO)
+            # Seteamos el rango del Slider al cargar el libro
             self.slider_paginas.setMaximum(self.total_paginas)
             self.slider_paginas.setValue(1)
 
@@ -531,7 +558,7 @@ class PimientoJoeApp(QMainWindow):
         self.lbl_contador_pag.setText(f"Página: {self.pagina_actual + 1} / {self.total_paginas}")
         self.lbl_slider_contador.setText(f"{self.pagina_actual + 1} / {self.total_paginas}")
         
-        # Sincronizamos la posición del Slider bloqueando señales para evitar loops infinitos (NUEVO)
+        # Sincronizamos la posición del Slider bloqueando señales
         self.slider_paginas.blockSignals(True)
         self.slider_paginas.setValue(self.pagina_actual + 1)
         self.slider_paginas.blockSignals(False)
@@ -546,7 +573,7 @@ class PimientoJoeApp(QMainWindow):
             self.pagina_actual += 1
             self.mostrar_pagina()
 
-    # IR A PÁGINA MEDIANTE DESLIZADOR (NUEVO)
+    # IR A PÁGINA MEDIANTE DESLIZADOR
     def ir_a_pagina_slider(self, valor):
         if self.doc:
             self.pagina_actual = valor - 1
@@ -646,6 +673,7 @@ class PimientoJoeApp(QMainWindow):
     # --- PINTADO DE LA MARCA DE AGUA CONTINUA EN EL FONDO ---
     def paintEvent(self, event):
         super().paintEvent(event)
+        # Si el libro está cargado, dibujamos la marca de agua fantasmal de fondo
         if self.visor_stack.currentIndex() == 1 and os.path.exists(RUTA_ICONO):
             painter = QPainter(self)
             painter.setOpacity(0.06)  
@@ -681,6 +709,14 @@ class PimientoJoeApp(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    
+    # FORZAR A GNOME/LINUX A USAR NUESTRO ICONO EN EL DOCK DE ABAJO
+    if os.path.exists(RUTA_ICONO):
+        app.setWindowIcon(QIcon(RUTA_ICONO))
+        
+    # AUTO-REGISTRAR LANZADOR EN LA MÁQUINA DONDE SE ABRA (NUEVO)
+    auto_registrar_desktop_linux()
+        
     splash = SplashScreen()
     splash.show()
     main_app = PimientoJoeApp()
