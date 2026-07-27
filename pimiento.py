@@ -1,11 +1,6 @@
 import sys
 import os
-import re
-import asyncio
 import threading
-import subprocess  # Para inyectar comandos de sistema de forma segura
-import fitz  # PyMuPDF
-import edge_tts
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QPushButton, QLabel, QFileDialog, QFrame, 
                              QStackedWidget, QHBoxLayout, QSpinBox, QMessageBox,
@@ -32,14 +27,12 @@ def resource_path(relative_path):
 
 RUTA_ICONO = resource_path("img/pimentin.png")
 
-# --- LÓGICA DE AUTO-REGISTRO PORTABLE CON FILTRO DE INSTALACIÓN ---
+# --- LÓGICA DE AUTO-REGISTRO PORTABLE ---
 def auto_registrar_desktop_linux():
-    """ Registra el icono y el lanzador local sólo si es portable """
     if getattr(sys, 'frozen', False):
         try:
             executable_path = os.path.abspath(sys.executable)
             
-            # 1. Guardar el icono en el sistema local
             dest_icon_dir = os.path.expanduser("~/.local/share/icons")
             os.makedirs(dest_icon_dir, exist_ok=True)
             dest_icon_path = os.path.join(dest_icon_dir, "pimentin_app.png")
@@ -48,12 +41,10 @@ def auto_registrar_desktop_linux():
                 import shutil
                 shutil.copy(RUTA_ICONO, dest_icon_path)
                 
-            # Lanzador del sistema local
             desktop_dir = os.path.expanduser("~/.local/share/applications")
             os.makedirs(desktop_dir, exist_ok=True)
             desktop_file_path = os.path.join(desktop_dir, "pimiento.desktop")
             
-            # Escribimos el del sistema local
             with open(desktop_file_path, "w") as f:
                 f.write(f"""[Desktop Entry]
 Type=Application
@@ -64,19 +55,10 @@ Terminal=false
 StartupWMClass=pimiento
 """)
             os.chmod(desktop_file_path, 0o755)
-            
-            # Inyectamos confianza en el acceso directo del sistema local
-            try:
-                subprocess.run(["gio", "set", desktop_file_path, "metadata::trusted", "yes"], capture_output=True)
-                subprocess.run(["gio", "set", desktop_file_path, "metadata::trusted", "true"], capture_output=True)
-            except Exception:
-                pass
 
-            # 2. SOLO CREAR EL ACCESO DIRECTO LOCAL SI NO ESTAMOS INSTALADOS EN /opt/ (Evita leak en /opt)
-            if "opt/pimiento_joe" not in executable_path.lower():
-                local_desktop_path = os.path.join(os.path.dirname(executable_path), "PimientoJoe.desktop")
-                with open(local_desktop_path, "w") as f:
-                    f.write(f"""[Desktop Entry]
+            local_desktop_path = os.path.join(os.path.dirname(executable_path), "PimientoJoe.desktop")
+            with open(local_desktop_path, "w") as f:
+                f.write(f"""[Desktop Entry]
 Type=Application
 Name=Pimiento Joe
 Exec="{executable_path}"
@@ -84,14 +66,16 @@ Icon={dest_icon_path}
 Terminal=false
 StartupWMClass=pimiento
 """)
-                os.chmod(local_desktop_path, 0o755)
-                
-                # Inyectamos confianza al acceso directo local
-                try:
-                    subprocess.run(["gio", "set", local_desktop_path, "metadata::trusted", "yes"], capture_output=True)
-                    subprocess.run(["gio", "set", local_desktop_path, "metadata::trusted", "true"], capture_output=True)
-                except Exception:
-                    pass
+            os.chmod(local_desktop_path, 0o755)
+            
+            try:
+                import subprocess
+                subprocess.run(["gio", "set", desktop_file_path, "metadata::trusted", "yes"], capture_output=True)
+                subprocess.run(["gio", "set", desktop_file_path, "metadata::trusted", "true"], capture_output=True)
+                subprocess.run(["gio", "set", local_desktop_path, "metadata::trusted", "yes"], capture_output=True)
+                subprocess.run(["gio", "set", local_desktop_path, "metadata::trusted", "true"], capture_output=True)
+            except Exception:
+                pass
 
         except Exception:
             pass
@@ -137,6 +121,8 @@ class WelcomeWidget(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("WelcomeWidget")
+        # CLAVE: Obligamos a que ignore los arrastres para que los herede la ventana principal (Sugerencia 1)
+        self.setAcceptDrops(False)
         
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -174,25 +160,16 @@ class PimientoJoeApp(QMainWindow):
             }}
         """
 
-        self.voces_map = {
-            "🇪🇸 Español (España) - Elvira": "es-ES-ElviraNeural",
-            "🇲🇽 Español (México) - Dalia": "es-MX-DaliaNeural",
-            "🇨🇳 Chino (Mandarín) - Xiaoxiao": "zh-CN-XiaoxiaoNeural",
-            "🇺🇸 Inglés (EE.UU.) - Aria": "en-US-AriaNeural",
-            "🇬🇧 Inglés (R.Unido) - Sonia": "en-GB-SoniaNeural",
-            "🇫🇷 Francés - Denise": "fr-FR-DeniseNeural",
-            "🇩🇪 Alemán - Amala": "de-DE-AmalaNeural",
-            "🇮🇹 Italiano - Elsa": "it-IT-ElsaNeural"
-        }
-
+        # Mapeo de velocidad para el motor local Piper (length_scale: mayor es más lento)
         self.velocidad_map = {
-            "🐢 Muy Despacio (Nivel 1)": "-30%",
-            "🚶 Despacio (Nivel 2)": "-15%",
-            "🏠 Normal (Nivel 3)": "+0%",
-            "⚡ Rápido (Nivel 4)": "+15%",
-            "🚀 Muy Rápido (Nivel 5)": "+30%"
+            "🐢 Muy Despacio (Nivel 1)": 1.35,
+            "🚶 Despacio (Nivel 2)": 1.15,
+            "🏠 Normal (Nivel 3)": 1.00,
+            "⚡ Rápido (Nivel 4)": 0.85,
+            "🚀 Muy Rápido (Nivel 5)": 0.70
         }
 
+        # Permitir Arrastre en la ventana principal (Sugerencia 1)
         self.setAcceptDrops(True)
         
         if os.path.exists(RUTA_ICONO):
@@ -255,24 +232,24 @@ class PimientoJoeApp(QMainWindow):
         self.pagina_actual = 0
         self.total_paginas = 0
         
-        # CONFIGURACIÓN DEL ANIMADOR ESPACIAL CON TEXTO DE TIEMPO
+        # CONFIGURACIÓN DEL ANIMADOR ESPACIAL CON TEXTO OFFLINE (NUEVO)
         self.timer_espacial = QTimer()
         self.timer_espacial.timeout.connect(self.actualizar_animacion_espacial)
         self.contador_frame = 0
         self.frames_espacio = [
-            "⚡ Conectando con el espacio exterior (Edge TTS)... (esto puede llevar un tiempo) 🛸      ",
-            "⚡ Conectando con el espacio exterior (Edge TTS)... (esto puede llevar un tiempo)  🛸     ",
-            "⚡ Conectando con el espacio exterior (Edge TTS)... (esto puede llevar un tiempo)   🛸    ",
-            "⚡ Conectando con el espacio exterior (Edge TTS)... (esto puede llevar un tiempo)    🛸   ",
-            "⚡ Conectando con el espacio exterior (Edge TTS)... (esto puede llevar un tiempo)     🛸  ",
-            "⚡ Conectando con el espacio exterior (Edge TTS)... (esto puede llevar un tiempo)      🛸 ",
-            "⚡ Conectando con el espacio exterior (Edge TTS)... (esto puede llevar un tiempo)       🛸",
-            "⚡ Conectando con el espacio exterior (Edge TTS)... (esto puede llevar un tiempo)      👾 ",
-            "⚡ Conectando con el espacio exterior (Edge TTS)... (esto puede llevar un tiempo)     👾  ",
-            "⚡ Conectando con el espacio exterior (Edge TTS)... (esto puede llevar un tiempo)    👾   ",
-            "⚡ Conectando con el espacio exterior (Edge TTS)... (esto puede llevar un tiempo)   👾    ",
-            "⚡ Conectando con el espacio exterior (Edge TTS)... (esto puede llevar un tiempo)  👾     ",
-            "⚡ Conectando con el espacio exterior (Edge TTS)... (esto puede llevar un tiempo) 👾      "
+            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo) 🛸      ",
+            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)  🛸     ",
+            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)   🛸    ",
+            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)    🛸   ",
+            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)     🛸  ",
+            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)      🛸 ",
+            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)       🛸",
+            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)      👾 ",
+            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)     👾  ",
+            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)    👾   ",
+            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)   👾    ",
+            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)  👾     ",
+            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo) 👾      "
         ]
         
         self.avisador = AvisadorAudio()
@@ -414,12 +391,13 @@ class PimientoJoeApp(QMainWindow):
         
         visor_layout.addLayout(selec_layout)
 
-        # Configuración de Voz y Velocidad
+        # Configuración de Voz y Velocidad (IDIOMA FIJO LOCAL)
         idioma_layout = QHBoxLayout()
-        idioma_layout.addWidget(QLabel("🗣️ Voz:"))
-        self.combo_idioma = QComboBox()
-        self.combo_idioma.addItems(self.voces_map.keys())
-        idioma_layout.addWidget(self.combo_idioma)
+        idioma_layout.addWidget(QLabel("🗣️ Voz Activa:"))
+        
+        lbl_voz_local = QLabel("🇪🇸 Español - Davefx (Voz de IA Local Offline)")
+        lbl_voz_local.setStyleSheet(f"color: {NEON_GREEN}; font-size: 14px;")
+        idioma_layout.addWidget(lbl_voz_local)
 
         idioma_layout.addWidget(QLabel("  ⏱️ Velocidad:"))
         self.combo_velocidad = QComboBox()
@@ -450,11 +428,10 @@ class PimientoJoeApp(QMainWindow):
         place_layout = QVBoxLayout(self.placeholder_widget)
         place_layout.setAlignment(Qt.AlignmentFlag.AlignCenter) 
         
-        # Texto limpio sin el cartel de AZW3
         self.lbl_bienvenida = QLabel(
             "💡 Haz clic en 'Cargar Libro' arriba\n"
             "O ARRASTRA TU ARCHIVO DIRECTAMENTE AQUÍ PARA EMPEZAR\n\n"
-            "Soporta: PDF, EPUB y MOBI"
+            "Soporta: PDF, EPUB y MOBI (100% Offline)"
         )
         self.lbl_bienvenida.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_bienvenida.setStyleSheet("""
@@ -481,7 +458,7 @@ class PimientoJoeApp(QMainWindow):
         main_layout.addWidget(self.lbl_estado)
 
         # Botón de Generar
-        self.btn_generar = QPushButton("🎧 GENERAR AUDIO MP3 🎧")
+        self.btn_generar = QPushButton("🎧 GENERAR AUDIO OFFLINE 🎧")
         self.btn_generar.setStyleSheet(f"QPushButton {{ background-color: {ORANGE_ACCENT}; color: white; border: 2px solid white; font-size: 20px; }} QPushButton:hover {{ background-color: #ff3300; }}")
         self.btn_generar.hide()
         self.btn_generar.clicked.connect(self.iniciar_generacion_audio)
@@ -495,13 +472,12 @@ class PimientoJoeApp(QMainWindow):
 
         self.comprobar_seleccion_texto()
 
-    # --- LÓGICA DE ARRASTRAR Y SOLTAR ---
+    # --- LÓGICA DE ARRASTRAR Y SOLTAR CORREGIDA (Sugerencia 1) ---
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
-            ruta = event.mimeData().urls()[0].toLocalFile()
-            if ruta.lower().endswith(('.pdf', '.epub', '.mobi')):
-                event.acceptProposedAction()
-                self.placeholder_widget.setStyleSheet(self.STYLE_BIENVENIDA_DRAG)
+            # Aceptamos el arrastre propuesto de forma directa (Wayland compatible)
+            event.acceptProposedAction()
+            self.placeholder_widget.setStyleSheet(self.STYLE_BIENVENIDA_DRAG)
                 
     def dragLeaveEvent(self, event):
         self.placeholder_widget.setStyleSheet(self.STYLE_BIENVENIDA_NORMAL)
@@ -509,8 +485,11 @@ class PimientoJoeApp(QMainWindow):
     def dropEvent(self, event):
         if event.mimeData().hasUrls():
             ruta = event.mimeData().urls()[0].toLocalFile()
-            self.cargar_libro_desde_ruta(ruta)
-            event.acceptProposedAction()
+            if ruta.lower().endswith(('.pdf', '.epub', '.mobi')):
+                self.cargar_libro_desde_ruta(ruta)
+                event.acceptProposedAction()
+            else:
+                event.ignore()
 
     # --- LÓGICA DE CARGA CENTRALIZADA ---
     def cargar_archivo_dialogo(self):
@@ -655,16 +634,14 @@ class PimientoJoeApp(QMainWindow):
         if self.visor_stack.currentIndex() == 1 and self.doc:
             self.mostrar_pagina()
 
-    # --- LÓGICA DE AUDIO (MIGRADA AL BACKEND) ---
+    # --- LÓGICA DE AUDIO (MIGRADA AL BACKEND OFFLINE) ---
     def iniciar_generacion_audio(self):
         n1 = self.spin_n1.value()
         n2 = self.spin_n2.value()
         recorte_inicio = self.txt_recorte_inicio.text().strip()
         recorte_fin = self.txt_recorte_fin.text().strip()
 
-        idioma_elegido = self.combo_idioma.currentText()
-        voz_activa = self.voces_map[idioma_elegido]
-
+        # Identificar la velocidad de lectura (length_scale de Piper)
         velocidad_elegida = self.combo_velocidad.currentText()
         velocidad_rate = self.velocidad_map[velocidad_elegida]
 
@@ -681,15 +658,18 @@ class PimientoJoeApp(QMainWindow):
 
         hilo = threading.Thread(
             target=self.proceso_audio_background, 
-            args=(n1, n2, recorte_inicio, recorte_fin, voz_activa, velocidad_rate)
+            args=(n1, n2, recorte_inicio, recorte_fin, velocidad_rate)
         )
         hilo.start()
 
-    def proceso_audio_background(self, n1, n2, recorte_inicio, recorte_fin, voz, rate):
+    def proceso_audio_background(self, n1, n2, recorte_inicio, recorte_fin, rate):
         try:
             texto_completo = lector.extraer_y_recortar_texto(self.doc, n1, n2, recorte_inicio, recorte_fin)
             nombre_salida = lector.generar_nombre_salida(self.ruta_archivo, n1, n2)
-            asyncio.run(lector.generar_mp3_async(texto_completo, nombre_salida, voz, rate))
+            
+            # USAMOS NUESTRO BACKEND OFFLINE PIPER (NUEVO)
+            lector.generar_audio_offline(texto_completo, nombre_salida, rate)
+            
             self.avisador.finalizado.emit(nombre_salida)
         except Exception as e:
             self.avisador.error.emit(str(e))
@@ -725,7 +705,7 @@ class PimientoJoeApp(QMainWindow):
         QMessageBox.information(
             self, 
             "¡Listo para dormir!", 
-            f"El fragmento exacto se ha generado:\n\n👉 {archivo}"
+            f"El fragmento exacto se ha generado en formato de alta fidelidad:\n\n👉 {archivo}"
         )
 
     def audio_error(self, error_msg):
@@ -733,7 +713,7 @@ class PimientoJoeApp(QMainWindow):
         self.lbl_estado.setText("")
         self.btn_generar.setEnabled(True)
         self.btn_cargar.setEnabled(True)
-        QMessageBox.critical(self, "Error de recorte/red", f"No se pudo crear el audio:\n{error_msg}")
+        QMessageBox.critical(self, "Error de recorte/IA", f"No se pudo crear el audio:\n{error_msg}")
 
 
 if __name__ == "__main__":
@@ -741,7 +721,7 @@ if __name__ == "__main__":
     
     # FORZAR A GNOME/LINUX A USAR NUESTRO ICONO EN EL DOCK DE ABAJO
     app.setApplicationName("pimiento")
-    app.setDesktopFileName("pimiento") # CLAVE: Enlaza la app en ejecución con pimiento.desktop
+    app.setDesktopFileName("pimiento") 
     
     if os.path.exists(RUTA_ICONO):
         app.setWindowIcon(QIcon(RUTA_ICONO))
