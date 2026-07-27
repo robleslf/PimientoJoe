@@ -37,7 +37,7 @@ pip install --upgrade pip
 
 # 5. Instalar todas las dependencias
 if [ -f "requirements.txt" ]; then
-    echo "📥 Instalando librerías y herramientas de compilación desde requirements.txt..."
+    echo "📥 Instaling librerías y herramientas de compilación desde requirements.txt..."
     pip install -r requirements.txt
 else
     echo "❌ Error crítico: No se encontró el archivo 'requirements.txt'."
@@ -48,9 +48,9 @@ fi
 echo "🚀 Compilando ejecutable portable de PIMIENTO JOE..."
 pyinstaller --onefile --windowed --add-data "img/pimentin.png:img" --icon="img/pimentin.png" pimiento.py
 
-# 7. NUEVO: Empaquetar la release de Jose Luis en un .tar.gz que sí mantiene los permisos de Linux (Sugerencia 3)
+# 7. Empaquetar la release de Jose Luis (Compresión limpia solo del binario)
 echo "📦 Creando el archivo portable comprimido para Jose Luis..."
-tar -czf PimientoJoe_portable.tar.gz -C dist pimiento PimientoJoe.desktop
+tar -czf PimientoJoe_portable.tar.gz -C dist pimiento
 
 echo "--------------------------------------------------------"
 echo "✨ ¡PROCESO COMPLETADO CON ÉXITO! ✨"
