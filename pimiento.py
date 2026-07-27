@@ -121,11 +121,35 @@ class SplashScreen(QWidget):
         layout.addWidget(frame)
 
 class WelcomeWidget(QFrame):
+    fileDropped = pyqtSignal(str)  
+    draggedEnter = pyqtSignal()   
+    draggedLeave = pyqtSignal()   
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("WelcomeWidget")
-        self.setAcceptDrops(False)
+        self.setAcceptDrops(True)
         
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            ruta = event.mimeData().urls()[0].toLocalFile()
+            if ruta.lower().endswith(('.pdf', '.epub', '.mobi')):
+                event.acceptProposedAction()
+                self.draggedEnter.emit() 
+                
+    def dragLeaveEvent(self, event):
+        self.draggedLeave.emit() 
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event):
+        if event.mimeData().hasUrls():
+            ruta = event.mimeData().urls()[0].toLocalFile()
+            if ruta.lower().endswith(('.pdf', '.epub', '.mobi')):
+                self.fileDropped.emit(ruta) 
+                event.acceptProposedAction()
+        else:
+            event.ignore()
+
     def paintEvent(self, event):
         super().paintEvent(event)
         if os.path.exists(RUTA_ICONO):
@@ -162,7 +186,6 @@ class PimientoJoeApp(QMainWindow):
             }}
         """
 
-        # Voces locales offline mapeadas a su código de idioma en el backend (NUEVO)
         self.voces_map = {
             "🇪🇸 Español (Local) - Davefx": "es_ES",
             "🇺🇸 Inglés (Local) - Amy": "en_US",
@@ -177,7 +200,7 @@ class PimientoJoeApp(QMainWindow):
             "🚀 Muy Rápido (Nivel 5)": 0.70
         }
 
-        self.setAcceptDrops(True)
+        self.setAcceptDrops(False)
         
         if os.path.exists(RUTA_ICONO):
             self.setWindowIcon(QIcon(RUTA_ICONO))
@@ -229,7 +252,7 @@ class PimientoJoeApp(QMainWindow):
                 margin: -5px 0;
                 border-radius: 8px;
             }}
-            QSlider::handle:horizontal:hover {{
+            QSlider::handle:hover {{
                 background: {NEON_GREEN};
             }}
         """)
@@ -239,24 +262,24 @@ class PimientoJoeApp(QMainWindow):
         self.pagina_actual = 0
         self.total_paginas = 0
         
-        # CONFIGURACIÓN DEL ANIMADOR ESPACIAL CON TEXTO OFFLINE
+        # CONFIGURACIÓN DEL ANIMADOR ESPACIAL CON TEXTO ORIGINAL RESTAURADO
         self.timer_espacial = QTimer()
         self.timer_espacial.timeout.connect(self.actualizar_animacion_espacial)
         self.contador_frame = 0
         self.frames_espacio = [
-            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo) 🛸      ",
-            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)  🛸     ",
-            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)   🛸    ",
-            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)    🛸   ",
-            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)     🛸  ",
-            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)      🛸 ",
-            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)       🛸",
-            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)      👾 ",
-            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)     👾  ",
-            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)    👾   ",
-            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)   👾    ",
-            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo)  👾     ",
-            "⚡ Procesando audio con Inteligencia Artificial local (Piper TTS)... (esto puede llevar un tiempo) 👾      "
+            "⚡ Conectando con el espacio exterior... (esto puede llevar un tiempo) 🛸      ",
+            "⚡ Conectando con el espacio exterior... (esto puede llevar un tiempo)  🛸     ",
+            "⚡ Conectando con el espacio exterior... (esto puede llevar un tiempo)   🛸    ",
+            "⚡ Conectando con el espacio exterior... (esto puede llevar un tiempo)    🛸   ",
+            "⚡ Conectando con el espacio exterior... (esto puede llevar un tiempo)     🛸  ",
+            "⚡ Conectando con el espacio exterior... (esto puede llevar un tiempo)      🛸 ",
+            "⚡ Conectando con el espacio exterior... (esto puede llevar un tiempo)       🛸",
+            "⚡ Conectando con el espacio exterior... (esto puede llevar un tiempo)      👾 ",
+            "⚡ Conectando con el espacio exterior... (esto puede llevar un tiempo)     👾  ",
+            "⚡ Conectando con el espacio exterior... (esto puede llevar un tiempo)    👾   ",
+            "⚡ Conectando con el espacio exterior... (esto puede llevar un tiempo)   👾    ",
+            "⚡ Conectando con el espacio exterior... (esto puede llevar un tiempo)  👾     ",
+            "⚡ Conectando con el espacio exterior... (esto puede llevar un tiempo) 👾      "
         ]
         
         self.avisador = AvisadorAudio()
@@ -376,6 +399,8 @@ class PimientoJoeApp(QMainWindow):
 
         # Controles selección numérica
         selec_layout = QHBoxLayout()
+        selec_layout.setSpacing(10)
+        
         selec_layout.addWidget(QLabel("Generar desde pág:"))
         self.spin_n1 = QSpinBox()
         self.spin_n1.setMinimum(1)
@@ -396,10 +421,13 @@ class PimientoJoeApp(QMainWindow):
         self.btn_fijar_fin.clicked.connect(self.fijar_fin)
         selec_layout.addWidget(self.btn_fijar_fin)
         
+        selec_layout.addStretch(1)
         visor_layout.addLayout(selec_layout)
 
-        # Configuración de Voz y Velocidad (SELECTOR MULTILINGÜE LOCAL RESTAURADO)
+        # Configuración de Voz y Velocidad
         idioma_layout = QHBoxLayout()
+        idioma_layout.setSpacing(10)
+        
         idioma_layout.addWidget(QLabel("🗣️ Voz Activa:"))
         self.combo_idioma = QComboBox()
         self.combo_idioma.addItems(self.voces_map.keys())
@@ -410,6 +438,14 @@ class PimientoJoeApp(QMainWindow):
         self.combo_velocidad.addItems(self.velocidad_map.keys())
         self.combo_velocidad.setCurrentIndex(2) 
         idioma_layout.addWidget(self.combo_velocidad)
+
+        idioma_layout.addWidget(QLabel("  🎵 Formato:"))
+        self.combo_formato = QComboBox()
+        self.combo_formato.addItems(["🎧 MP3 (Compreso)", "🔊 WAV (Calidad CD)"])
+        self.combo_formato.setCurrentIndex(0) 
+        idioma_layout.addWidget(self.combo_formato)
+        
+        idioma_layout.addStretch(1)
         visor_layout.addLayout(idioma_layout)
 
         # Controles para Recorte Inteligente
@@ -434,6 +470,7 @@ class PimientoJoeApp(QMainWindow):
         place_layout = QVBoxLayout(self.placeholder_widget)
         place_layout.setAlignment(Qt.AlignmentFlag.AlignCenter) 
         
+        # Texto limpio sin el cartel de AZW3
         self.lbl_bienvenida = QLabel(
             "💡 Haz clic en 'Cargar Libro' arriba\n"
             "O ARRASTRA TU ARCHIVO DIRECTAMENTE AQUÍ PARA EMPEZAR\n\n"
@@ -464,7 +501,7 @@ class PimientoJoeApp(QMainWindow):
         main_layout.addWidget(self.lbl_estado)
 
         # Botón de Generar
-        self.btn_generar = QPushButton("🎧 GENERAR AUDIO OFFLINE 🎧")
+        self.btn_generar = QPushButton("🎧 GENERAR AUDIO 🎧")
         self.btn_generar.setStyleSheet(f"QPushButton {{ background-color: {ORANGE_ACCENT}; color: white; border: 2px solid white; font-size: 20px; }} QPushButton:hover {{ background-color: #ff3300; }}")
         self.btn_generar.hide()
         self.btn_generar.clicked.connect(self.iniciar_generacion_audio)
@@ -478,10 +515,9 @@ class PimientoJoeApp(QMainWindow):
 
         self.comprobar_seleccion_texto()
 
-    # --- LÓGICA DE ARRASTRAR Y SOLTAR CORREGIDA ---
+    # --- LÓGICA DE ARRASTRAR Y SOLTAR ---
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
-            # Aceptamos el arrastre propuesto de forma directa (Wayland compatible)
             event.acceptProposedAction()
             self.placeholder_widget.setStyleSheet(self.STYLE_BIENVENIDA_DRAG)
                 
@@ -655,6 +691,10 @@ class PimientoJoeApp(QMainWindow):
         velocidad_elegida = self.combo_velocidad.currentText()
         velocidad_rate = self.velocidad_map[velocidad_elegida]
 
+        # Identificar el formato elegido por el usuario (MP3 o WAV)
+        formato_elegido = self.combo_formato.currentText()
+        formato_code = "mp3" if "MP3" in formato_elegido else "wav"
+
         if n1 > n2:
             QMessageBox.warning(self, "¡Error noventero!", "La página de inicio no puede ser mayor que la página de fin.")
             return
@@ -668,18 +708,15 @@ class PimientoJoeApp(QMainWindow):
 
         hilo = threading.Thread(
             target=self.proceso_audio_background, 
-            args=(n1, n2, recorte_inicio, recorte_fin, velocidad_rate, idioma_code)
+            args=(n1, n2, recorte_inicio, recorte_fin, velocidad_rate, idioma_code, formato_code)
         )
         hilo.start()
 
-    def proceso_audio_background(self, n1, n2, recorte_inicio, recorte_fin, rate, idioma_code):
+    def proceso_audio_background(self, n1, n2, recorte_inicio, recorte_fin, rate, idioma_code, formato_code):
         try:
             texto_completo = lector.extraer_y_recortar_texto(self.doc, n1, n2, recorte_inicio, recorte_fin)
-            nombre_salida = lector.generar_nombre_salida(self.ruta_archivo, n1, n2)
-            
-            # Pasamos también el idioma elegido al motor de voz offline (NUEVO)
-            lector.generar_audio_offline(texto_completo, nombre_salida, rate, idioma_code)
-            
+            nombre_salida = lector.generar_nombre_salida(self.ruta_archivo, n1, n2, formato_code)
+            lector.generar_audio_offline(texto_completo, nombre_salida, rate, idioma_code, formato_code)
             self.avisador.finalizado.emit(nombre_salida)
         except Exception as e:
             self.avisador.error.emit(str(e))
@@ -715,7 +752,7 @@ class PimientoJoeApp(QMainWindow):
         QMessageBox.information(
             self, 
             "¡Listo para dormir!", 
-            f"El fragmento exacto se ha generado en formato de alta fidelidad:\n\n👉 {archivo}"
+            f"El fragmento exacto se ha generado:\n\n👉 {archivo}"
         )
 
     def audio_error(self, error_msg):
@@ -723,7 +760,7 @@ class PimientoJoeApp(QMainWindow):
         self.lbl_estado.setText("")
         self.btn_generar.setEnabled(True)
         self.btn_cargar.setEnabled(True)
-        QMessageBox.critical(self, "Error de recorte/IA", f"No se pudo crear el audio:\n{error_msg}")
+        QMessageBox.critical(self, "Error de recorte/red", f"No se pudo crear el audio:\n{error_msg}")
 
 
 if __name__ == "__main__":

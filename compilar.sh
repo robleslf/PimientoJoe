@@ -4,7 +4,7 @@
 # Abortar inmediatamente si ocurre algún error inesperado
 set -e
 
-echo "🌶️  Iniciando Setup de Desarrollo y Compilación de PIMIENTO JOE OFFLINE..."
+echo "🌶️  Iniciando Setup de Desarrollo y Compilación de PIMIENTO JOE..."
 
 # 1. Verificar si Python 3 está instalado en el sistema
 if ! command -v python3 &> /dev/null; then
@@ -27,7 +27,7 @@ else
     echo "✅ Entorno virtual 'env' detectado."
 fi
 
-# 3. Descargar el motor neuronal Piper TTS y las voces locales de forma portátil (Sugerencia 1)
+# 3. Descargar el motor neuronal Piper TTS, las voces locales y LAME (Sugerencia 1 y 2)
 if [ ! -d "bin/piper" ]; then
     echo "📥 Descargando motor de voz offline Piper TTS..."
     mkdir -p bin/piper
@@ -49,7 +49,16 @@ if [ ! -d "bin/piper" ]; then
     wget -q --show-progress -O bin/piper/zh_CN-huayan-medium.onnx "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/zh/zh_CN/huayan/medium/zh_CN-huayan-medium.onnx?download=true"
     wget -q --show-progress -O bin/piper/zh_CN-huayan-medium.onnx.json "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/zh/zh_CN/huayan/medium/zh_CN-huayan-medium.onnx.json?download=true"
 
-    echo "✅ Motor offline y voces listas en bin/piper/."
+    echo "📥 Extrayendo decodificador de MP3 LAME..."
+    # Intentamos descargar el paquete lame de ubuntu de forma segura sin instalarlo en tu PC
+    apt-get download lame &>/dev/null || wget -q -O /tmp/lame.deb "http://archive.ubuntu.com/ubuntu/pool/universe/l/lame/lame_3.100-3_amd64.deb"
+    mkdir -p /tmp/lame_ext
+    dpkg-deb -x *.deb /tmp/lame_ext 2>/dev/null || dpkg-deb -x /tmp/lame.deb /tmp/lame_ext
+    cp /tmp/lame_ext/usr/bin/lame bin/piper/lame
+    rm -rf /tmp/lame_ext /tmp/lame.deb *.deb
+    chmod +x bin/piper/lame
+
+    echo "✅ Motor offline, voces y decodificador LAME listos en bin/piper/."
 fi
 
 # 4. Activar el entorno virtual seguro
@@ -69,7 +78,7 @@ else
     exit 1
 fi
 
-# 7. Compilar Pimiento Joe (Empaquetamos la carpeta de Piper y todas las voces dentro de la app)
+# 7. Compilar Pimiento Joe (Empaquetamos la carpeta de Piper, voces y LAME dentro de la app)
 echo "🚀 Compilando ejecutable portable de PIMIENTO JOE OFFLINE..."
 pyinstaller --onefile --windowed \
     --add-data "img/pimentin.png:img" \
@@ -77,7 +86,7 @@ pyinstaller --onefile --windowed \
     --icon="img/pimentin.png" \
     pimiento.py
 
-# 8. Empaquetar la release comprimida (Sin menciones personales)
+# 8. Empaquetar la release de Jose Luis (Compresión limpia del binario portable)
 echo "📦 Creando el archivo portable comprimido para compartir..."
 tar -czf PimientoJoe_portable.tar.gz -C dist pimiento
 
