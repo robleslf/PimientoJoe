@@ -31,15 +31,13 @@ def resource_path(relative_path):
 
 RUTA_ICONO = resource_path("img/pimentin.png")
 
-# --- LÓGICA DE AUTO-REGISTRO PORTABLE PARA AMIGOS (NUEVO) ---
+# --- LÓGICA DE AUTO-REGISTRO PORTABLE ---
 def auto_registrar_desktop_linux():
     """ Registra el icono y el lanzador de forma silenciosa en el PC de cualquier amigo """
-    # Solo actuar si estamos ejecutando el binario compilado (frozen)
     if getattr(sys, 'frozen', False):
         try:
             executable_path = os.path.abspath(sys.executable)
             
-            # 1. Guardar el icono en el sistema local del amigo de forma permanente
             dest_icon_dir = os.path.expanduser("~/.local/share/icons")
             os.makedirs(dest_icon_dir, exist_ok=True)
             dest_icon_path = os.path.join(dest_icon_dir, "pimentin_app.png")
@@ -48,7 +46,7 @@ def auto_registrar_desktop_linux():
                 import shutil
                 shutil.copy(RUTA_ICONO, dest_icon_path)
                 
-            # 2. Crear el lanzador .desktop dinámico apuntando a su USB/Drive actual
+            # 1. Crear el acceso directo en el sistema local
             desktop_dir = os.path.expanduser("~/.local/share/applications")
             os.makedirs(desktop_dir, exist_ok=True)
             desktop_file_path = os.path.join(desktop_dir, "pimiento.desktop")
@@ -63,8 +61,22 @@ Terminal=false
 StartupWMClass=pimiento
 """)
             os.chmod(desktop_file_path, 0o755)
+
+            # 2. NUEVO: Crear un acceso directo LOCAL al lado del ejecutable (para el USB de Jose Luis)
+            local_desktop_path = os.path.join(os.path.dirname(executable_path), "PimientoJoe.desktop")
+            with open(local_desktop_path, "w") as f:
+                f.write(f"""[Desktop Entry]
+Type=Application
+Name=Pimiento Joe
+Exec="{executable_path}"
+Icon={dest_icon_path}
+Terminal=false
+StartupWMClass=pimiento
+""")
+            os.chmod(local_desktop_path, 0o755)
+
         except Exception:
-            pass # Silencioso, si no tiene permisos que no rompa el arranque de la app
+            pass
 
 class AvisadorAudio(QObject):
     finalizado = pyqtSignal(str)
@@ -110,7 +122,6 @@ class WelcomeWidget(QFrame):
         
     def paintEvent(self, event):
         super().paintEvent(event)
-        
         if os.path.exists(RUTA_ICONO):
             painter = QPainter(self)
             painter.setOpacity(0.06) 
@@ -711,10 +722,13 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     
     # FORZAR A GNOME/LINUX A USAR NUESTRO ICONO EN EL DOCK DE ABAJO
+    app.setApplicationName("pimiento")
+    app.setDesktopFileName("pimiento") # CLAVE: Enlaza la app en ejecución con pimiento.desktop
+    
     if os.path.exists(RUTA_ICONO):
         app.setWindowIcon(QIcon(RUTA_ICONO))
         
-    # AUTO-REGISTRAR LANZADOR EN LA MÁQUINA DONDE SE ABRA (NUEVO)
+    # AUTO-REGISTRAR LANZADOR EN LA MÁQUINA DONDE SE ABRA
     auto_registrar_desktop_linux()
         
     splash = SplashScreen()
